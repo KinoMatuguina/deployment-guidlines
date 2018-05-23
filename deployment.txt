@@ -1,0 +1,46 @@
+CLUSTERING in SINGLE SERVER
+
+1. Transfer redis.conf and redis-slave.conf to the config folder (/bpi or /opt) [check content if has 12(5bo_)%\6!8BF and ports: 6379 6380, respectively]
+
+2. Stop and remove existing redis containers
+
+3. Run docker scripts: (change /opt to /bpi when necessary)
+
+docker run -d --net=host -v /opt/config/redis.conf:/usr/local/etc/redis/redis.conf -v /docker/host/dir:/data/redis -p 16379:16379 -p 6379:6379 --name sxi-redis bpi.unitas.com:5000/utils/redis redis-server /usr/local/etc/redis/redis.conf --appendonly yes
+
+docker run -d --net=host -v /opt/config/redis-slave.conf:/usr/local/etc/redis/redis.conf -v /docker/host/dir:/data/redis -p 16380:16380 -p 6380:6380 --name sxi-redis-2 bpi.unitas.com:5000/utils/redis redis-server /usr/local/etc/redis/redis.conf --appendonly yes
+
+
+4. Initialize slots of sxi-redis
+
+docker exec -it sxi-redis bash
+
+for i in {0..16384}
+do 
+redis-cli -a '12(5bo_)%\6!8BF' -c -p 6379  cluster addslots $i
+done
+
+exit
+
+
+5. In sxi-redis-2, connect to redis in app1
+
+docker exec -it sxi-redis-2 redis-cli -a '12(5bo_)%\6!8BF' -p 6380 -c cluster meet <HOST IP ADDR> 6379
+
+
+6. In sxi-redis-2, tell node2 to replicate from node1
+
+docker exec -it sxi-redis-2 redis-cli -a '12(5bo_)%\6!8BF' -p 6380 -c cluster replicate `docker exec -it sxi-redis-2 redis-cli -a '12(5bo_)%\6!8BF' -p 6380 -c cluster nodes | grep -v myself | awk '{print $1}'`
+
+
+
+7. Test
+
+
+docker exec -it sxi-redis redis-cli -a '12(5bo_)%\6!8BF'
+set hello world
+exit
+
+docker exec -it sxi-redis-2 redis-cli -a '12(5bo_)%\6!8BF'
+get hello
+
